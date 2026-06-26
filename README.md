@@ -1,6 +1,3 @@
 # example-html-webpage
 
-*This should not be possible*
-For real
-For real, real
-for realzies
+This readme will soon contain more information
