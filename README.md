@@ -19,7 +19,7 @@ http://IP-NUMBER
 
 The aim was to get familiar with HTML, and so I tried out different simple attributes by scripting in VSCode and checking out the results in my web browser.
 
-To make sure that nginx reads the HTML file correctly it was names index.html.
+To make sure that nginx reads the HTML file correctly it was named index.html.
 
 #### Updating script and website
 
