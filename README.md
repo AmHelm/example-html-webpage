@@ -1,55 +1,72 @@
-# An example webpage for HTML practice
+# Adding a rust backend to serve the static html website
 
-This repository contains code developed as HTML practice during my internship. This is how I made my first website.
+So far, the website has just been a static html website, served by nginx. Now we want the website to have and actual backend, using an axum webserver to make it accessible from the outside. 
 
-## Installing a web server
+## Setting things up
 
-The website is hosted through a remote server and so nginx was installed and used to make the website available from outside, accessible through the ip-adress.
-
-Install nginx unless already installed.
+First and foremost, make sure that there is a new project directory and create a new rust project.
 ```bash
-sudo apt update
-sudo apt install -y nginx
+cargo new example-backend
+```
+This initiates a new directory containing a new src/main.rs file, as well as Cargo.toml and Cargo.lock files. 
+
+Now, go into the example-backend directory and import the html file, so that it can be used by the program. For example, this time I cloned the GitHub repository containing the index.html file.
+```bash
+cd example-backend
+gh repo clone username/repositoryname # I used AmHelm/example-html-webpage
 ```
 
-Check if nginx is working by accessing the website. There should be a "Welcome to nginx!" page if the server is serving web trafic. Replace IP-NUMBER with the server's ip-adress.
-http://IP-NUMBER
+## Adding dependencies
 
-### Building the code
-
-The aim was to get familiar with HTML, and so I tried out different simple attributes by scripting in VSCode and checking out the results in my web browser.
-
-To make sure that nginx reads the HTML file correctly it was named index.html.
-
-#### Updating script and website
-
-The work-in-progress script is stored on a local host, so when launching a new version of the website, the new script has to be pushed to the remote server.
-
-If not already in place on the remote server, enter the server and add a directory to store the file. Replace SERVERPATH with the path to where the HTML file will be on the server. Then exit the server.
+To add the dependencies to the Cargo.toml file, let cargo add them.
+Inside the example-backend directory, use:
 ```bash
-ssh build
-mkdir -p /tmp/SERVERPATH
+cargo add axum
+cargo add tokio --features full
+cargo add tower-http --features fs
+```
+You can also add the dependencies manually to the Cargo.toml file, under [dependencies].
+
+## Structure of the code
+
+To build a working code we need to understand the building blocks.
+Here are some good references on how to build a program like this:
+https://docs.rs/axum/latest/axum/struct.Router.html
+https://oneuptime.com/blog/post/2026-01-25-fast-http-router-axum-rust/view
+https://github.com/tokio-rs/axum/blob/main/examples/static-file-server/src/main.rs
+
+We need ServeDir from tower-http to find the index.html file and serve it, as ServeDir can serve an entire directory of static files. The .not_found_service() method handles a fallback if the file cannot be found. 
+
+We use Router to tell the program where requests should go, in this case the html page.
+
+SocketAddr give the full network adress, with an IP-adress and a port number.
+
+The listener makes it so that the servers can connect to networks/browsers by claiming a port, in this case using the IP-adress and port number from SocketAddr.
+
+Finally, we use axum to serve the webpage.
+
+Run the program and check the printed url to see if the webpage works.
+
+## Putting the project on the remote server
+
+When the code is ready, put it in the remote server, go to the server and run it. 
+
+First, access the server and make sure there is a directory to store the files.
+(Also, make sure that rust and other essential packages are installed on the remote server)
+```bash
+ssh servername@IP-ADRESS # Replace servername and IP-ADRESS with the remote server ids
+mkdir -p ~/projects/example-backend
 exit
 ```
-
-On the local device, copy the HTML file to the server. Replace HTMLFILEPATH with the path to the original script and NAME with the server name.
+Then copy the files from the local devide to the remote server.
 ```bash
-scp -r ~/HTMLFILEPATH/* NAME@IP-NUMBER:/tmp/SERVERPATH/
+scp -r Cargo.toml Cargo.lock src meme-original servername@IP-ADRESS:~/projects/example-backend/
 ```
-
-Enter the remote server again.
+Then go back on the server, enter the directory and run the program.
 ```bash
-ssh build
+ssh servername@IP-ADRESS
+cd projects/example-backend
+cargo run
 ```
-
-Then, on the remote server, move the file into place. 
-```bash
-sudo rm -rf /var/www/html/*
-sudo cp -r /tmp/SERVERPATH/* /var/www/html/
-sudo chown -R www-data:www-data /var/www/html
-```
-
-Check the website ip in bowser again to make sure the changes went through.
-http://IP-NUMBER
-
-With this method the local HTML script can be changed and things can be tested out on the local host, while the online webpage only shows a final product.
+Now the website should be accessible through http://IP-ADRESS:3000!
+NOTE: The website will only work while the program is active in the remote server session!
