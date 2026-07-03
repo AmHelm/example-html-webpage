@@ -22,13 +22,10 @@ const DIR_PATH: &str = "meme-original";
 const FILE_NAME: &str = "index.html";
 
 // The name of the text file we want to read
-const MEME_TEXTS: &str = "beingDifficult.md";
+const MEME_TEXTS: &str = "meme-texts.md";
 
 
 // Function that reads a file containing strings and returns a list
-// Does not print the emojis correctly, but maybe it's fine for now, 
-// maybe the html reads it correctly later? Otherwise solve later
-// Should add more error handling if file not there etc
 fn read_memes_from_file() -> io::Result<Vec<String>> {
 
     // Read the file
@@ -43,7 +40,6 @@ fn read_memes_from_file() -> io::Result<Vec<String>> {
     // Add each text line into a vector
     for line in reader.lines() {
         let line = line?;
-        //println!("{line}");
         lines.push(line);
     }
 
@@ -52,7 +48,7 @@ fn read_memes_from_file() -> io::Result<Vec<String>> {
 
 }
 
-// Should send off the meme strings in Json format
+// Sends off the meme strings in Json format
 async fn text_memes_to_json() -> Json<Vec<String>> {
 
     let memes = read_memes_from_file().unwrap();
@@ -71,7 +67,6 @@ async fn main(){
                                                     .not_found_service(ServeFile::new(file_path));
 
     // Initialize the router
-    // Add API here
     let app = Router::new()
                       .route("/api/memes", get(text_memes_to_json))
                       .fallback_service(serve_dir);
