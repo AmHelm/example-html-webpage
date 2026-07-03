@@ -27,6 +27,8 @@ cargo add tower-http --features fs
 ```
 You can also add the dependencies manually to the Cargo.toml file, under [dependencies].
 
+Keep adding dependencies in this way as the program is expanded upon.
+
 ## Structure of the code
 
 To build a working code we need to understand the building blocks.
@@ -46,6 +48,12 @@ The listener makes it so that the servers can connect to networks/browsers by cl
 Finally, we use axum to serve the webpage.
 
 Run the program and check the printed url to see if the webpage works.
+
+The previously hardcoded text strings have been moved from the frontend to the backend. For that to work the text strings are stored in the meme-texts.md file. The backend can read a file line-by-line and then wrap it into Json format thanks to the read_memes_from_file() and text_memes_to_json() functions. 
+Here is a good video tutorial: https://www.youtube.com/watch?v=cJLRKj_N1dw
+
+The frontend makes a fetch() call to the backend to get the Json formatted text strings at "/api/memes".
+Reference: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
 
 ## Putting the project on the remote server
 
