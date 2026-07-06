@@ -55,6 +55,8 @@ Here is a good video tutorial: https://www.youtube.com/watch?v=cJLRKj_N1dw
 The frontend makes a fetch() call to the backend to get the Json formatted text strings at "/api/memes".
 Reference: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
 
+The Backend now randomizes which meme text is sent to the frontend when the user press the button, instead of the frontend performing the randomizing function.
+
 ## Putting the project on the remote server
 
 When the code is ready, put it in the remote server, go to the server and run it. 

@@ -11,6 +11,7 @@ use std::net::SocketAddr;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::io;
+use rand::{Rng, seq::IndexedRandom};
 
 // Use reqwest to make GET requests from webpage?
 
@@ -48,14 +49,20 @@ fn read_memes_from_file() -> io::Result<Vec<String>> {
 
 }
 
-// Sends off the meme strings in Json format
-async fn text_memes_to_json() -> Json<Vec<String>> {
-
-    let memes = read_memes_from_file().unwrap();
+// Gets the meme texts and randomizes one of them
+// Sends off the meme string in Json format
+async fn get_random_meme() -> Json<String> {
     
+    let memes = read_memes_from_file().unwrap();
+
+    // Randomizer
+    let mut rng = rand::rng();
+    let mut random_meme = memes.choose(&mut rng).unwrap().to_string();
+
     // Wrap the text files into Json format
-    Json(memes)
+    Json(random_meme)
 }
+
 
 #[tokio::main]
 async fn main(){
@@ -68,7 +75,7 @@ async fn main(){
 
     // Initialize the router
     let app = Router::new()
-                      .route("/api/memes", get(text_memes_to_json))
+                      .route("/api/get_random_meme", get(get_random_meme))
                       .fallback_service(serve_dir);
 
     // Network adress: IP-adress + port
