@@ -47,7 +47,7 @@ async function getMeme() {
             throw new Error(`Response status: ${response.status}`);
         }
 
-        const meme= await response.json();
+        const meme = await response.json();
         document.getElementById("demo").innerHTML = meme;
     } 
     catch (error) {
