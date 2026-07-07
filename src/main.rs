@@ -1,19 +1,24 @@
-// Backend program that will serve the static meme webpage
+// Backend program that will serve the meme webpage
 
 #![allow(unused)]
 
 use axum::{Router, 
-           routing::get, 
-           Json};
+            routing::get, 
+            routing::post, 
+            Json,
+            http::StatusCode};
 use tower_http::services::{ServeDir, 
-                           ServeFile};
+                            ServeFile};
 use std::net::SocketAddr;
-use std::fs::File;
-use std::io::{BufReader, BufRead};
+use std::fs::{File, 
+                OpenOptions};
+use std::io::{BufReader, 
+                BufRead, 
+                Write};
 use std::io;
-use rand::{Rng, seq::IndexedRandom};
-
-// Use reqwest to make GET requests from webpage?
+use rand::{Rng, 
+            seq::IndexedRandom};
+use serde::Deserialize;
 
 // Which port we want the website to claim
 const PORT: u16 = 3000;
@@ -25,6 +30,12 @@ const FILE_NAME: &str = "index.html";
 // The name of the text file we want to read
 const MEME_TEXTS: &str = "meme-texts.md";
 
+// Struct for the incoming new memes from the frontend
+// serde deserializes the code (unwraps the Json format)
+#[derive(serde::Deserialize)]
+struct NewMeme {
+    text: String,
+}
 
 // Function that reads a file containing strings and returns a list
 fn read_memes_from_file() -> io::Result<Vec<String>> {
@@ -57,12 +68,32 @@ async fn get_random_meme() -> Json<String> {
 
     // Randomizer
     let mut rng = rand::rng();
-    let mut random_meme = memes.choose(&mut rng).unwrap().to_string();
+    let random_meme = memes.choose(&mut rng).unwrap().to_string();
 
     // Wrap the text files into Json format
     Json(random_meme)
 }
 
+// This function reads the new meme from the frontend, unwraps the Json format and sends the string to new_meme_to_file
+async fn add_meme(Json(payload): Json<NewMeme>) -> StatusCode {
+   
+    new_meme_to_file(&payload.text).unwrap();
+    StatusCode::CREATED
+}
+
+// Adds the submitted meme text to the meme-texts.md file
+// https://www.programiz.com/rust/file-handling
+fn new_meme_to_file(text: &str) -> io::Result<()> {
+
+    // Open a file with append option
+    let mut meme_file = OpenOptions::new()
+        .append(true)
+        .open(MEME_TEXTS)?;
+
+    // Write to a file on a new line
+    writeln!(meme_file, "{text}")?;
+    Ok(())
+}
 
 #[tokio::main]
 async fn main(){
@@ -76,6 +107,7 @@ async fn main(){
     // Initialize the router
     let app = Router::new()
                       .route("/api/get_random_meme", get(get_random_meme))
+                      .route("/api/add_meme", post(add_meme)) // Get the new memes that have been submitted in the frontend
                       .fallback_service(serve_dir);
 
     // Network adress: IP-adress + port
@@ -87,4 +119,3 @@ async fn main(){
 
     axum::serve(listener,app).await.unwrap()
 }
-
