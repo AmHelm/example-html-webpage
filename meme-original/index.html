@@ -61,8 +61,10 @@ async function getMeme() {
 async function addMeme() {
     const url = "/api/add_meme";
 
+    const memeInput = document.getElementById("newmeme");
+
     // Get the value from the submission field
-    const submittedMeme = document.getElementById("newmeme").value;
+    const submittedMeme = memeInput.value;
 
     // Makes sure that the submission isn't empty
     // https://www.w3schools.com/howto/howto_js_validation_empty_input.asp
@@ -84,7 +86,7 @@ async function addMeme() {
         }
 
         // Reset the submit field
-        document.getElementById("newmeme").value = "";
+        memeInput.value = "";
     } 
     catch (error) {
         console.error(error.message);
