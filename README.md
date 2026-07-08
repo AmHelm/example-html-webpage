@@ -57,6 +57,13 @@ Reference: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetc
 
 The Backend now randomizes which meme text is sent to the frontend when the user press the button, instead of the frontend performing the randomizing function.
 
+Users can submit new memes/text strings. When they do so the data is stored as Json in the url + /api/add_meme. The program then gets this information and sends it off to add_meme(), where the function loads the Json data in the for of the NewMeme struct.
+
+The NewMeme struct tells the program what the format of the memes will be. It also deserializes the data through the serde::Deserialize command before the struct definition. In the future this struct can be edited to include other forms of data.
+
+The add_meme() function then inputs the data into the new_meme_to_file() function, where the data is added to the meme-text.md file. writeln!() adds the text in a new line, which is important since the program read the file line-by-line in read_memes_from_file().
+Here is a good reference for file handling: https://www.programiz.com/rust/file-handling
+
 ## Putting the project on the remote server
 
 When the code is ready, put it in the remote server, go to the server and run it. 

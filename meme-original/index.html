@@ -20,13 +20,19 @@
 <p><small><sub>&#40;You can click the button several times &#128064;&#41;</sub></small></p>
     
 <div>   
-    <button type="randomText" onclick="getMeme()">
+    <button type="button" onclick="getMeme()">
         Give me an Intern Meme!
     </button>
 
 </div>
 
 <p id="demo"></p>
+
+<div>
+    <label for="newmeme">Submit a new meme:</label><br>
+    <input type="text" id="newmeme" name="newmeme" maxlength="200"><br>
+    <button type="button" onclick="addMeme()">Submit</button>
+</div>
 
 <script>
 
@@ -36,12 +42,51 @@ async function getMeme() {
     const url = "/api/get_random_meme";
     try {
         const response = await fetch(url);
+
         if (!response.ok) {
             throw new Error(`Response status: ${response.status}`);
         }
 
         const meme = await response.json();
         document.getElementById("demo").innerHTML = meme;
+    } 
+    catch (error) {
+        console.error(error.message);
+    }
+}
+
+// Sends the submitted newmeme to the backend
+// https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementById
+// This was usefull here as well: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
+async function addMeme() {
+    const url = "/api/add_meme";
+
+    const memeInput = document.getElementById("newmeme");
+
+    // Get the value from the submission field
+    const submittedMeme = memeInput.value;
+
+    // Makes sure that the submission isn't empty
+    // https://www.w3schools.com/howto/howto_js_validation_empty_input.asp
+    if (submittedMeme.trim() === "") {
+        alert("Submission cannot be empty!");
+        return;
+    }
+
+    try {
+        // fetch uses GET by default, here we have to specify POST
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({text: submittedMeme})
+        });
+
+        if (!response.ok) {
+            throw new Error(`Response status: ${response.status}`);
+        }
+
+        // Reset the submit field
+        memeInput.value = "";
     } 
     catch (error) {
         console.error(error.message);

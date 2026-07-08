@@ -7,3 +7,4 @@ FINE, here you go... &#128556; uhh... &#128556;
 ... Okay, you got me... There are no memes yet
 ... Come back tomorrow, K?
 Now this is just awkward for the both of us
+(Distraction) OOH THERE IS A NEW SUBMISSION THINGY?? LOOK AT THAT HUH
