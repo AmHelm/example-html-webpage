@@ -75,9 +75,33 @@ async fn get_random_meme() -> Json<String> {
 }
 
 // This function reads the new meme from the frontend, unwraps the Json format and sends the string to new_meme_to_file
+// This function also checks if the submission is valid (no empty submissions, max limit and no duplicates)
 async fn add_meme(Json(payload): Json<NewMeme>) -> StatusCode {
-   
-    new_meme_to_file(&payload.text).unwrap();
+
+    let text: &str = payload.text.trim();
+
+    let max_length: usize = 200;
+
+    // Checks if the submission is empty, is over a max limit of characters, contains a linebreak or is a duplicate
+    if text.is_empty() {
+        return StatusCode::BAD_REQUEST;
+    }
+    
+    if text.chars().count() > max_length {
+        return StatusCode::BAD_REQUEST;
+    }
+
+    if text.contains("\n") || text.contains("\r") {
+        return StatusCode::BAD_REQUEST;
+    }
+
+    let memes = read_memes_from_file().unwrap();
+    // This was helpful here: https://sts10.github.io/2019/06/06/is-all-equal-function.html
+    if memes.iter().any(|meme| meme == text){ // Checks for exact duplicates, it will not be case sensitive
+        return StatusCode::CONFLICT;
+    }
+
+    new_meme_to_file(text).unwrap();
     StatusCode::CREATED
 }
 
