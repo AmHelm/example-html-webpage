@@ -74,11 +74,49 @@ async fn get_random_meme() -> Json<String> {
     Json(random_meme)
 }
 
+// This function checks if the submission is valid (no empty submissions, max limit, no line-breaks and no duplicates)
+// This was helpful here: https://dev.to/syeedmdtalha/error-handling-in-axum-31a2 
+fn validate_meme(text: &str) -> Result<(), (StatusCode, String)> {
+
+    let max_length: usize = 200;
+
+    // Checks if the submission is empty, is over a max limit of characters, contains a linebreak or is a duplicate
+    if text.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "Submission cannot be empty!".to_string()));
+    }
+    
+    if text.chars().count() > max_length {
+        return Err((StatusCode::BAD_REQUEST, "Submission cannot be more than 200 characters!".to_string()));
+    }
+
+    if text.contains("\n") || text.contains("\r") {
+        return Err((StatusCode::BAD_REQUEST, "Submission cannot have line-breaks!".to_string()));
+    }
+
+    let memes = read_memes_from_file().unwrap();
+    // This was helpful here: https://sts10.github.io/2019/06/06/is-all-equal-function.html
+    if memes.iter().any(|meme| meme == text){ // Checks for exact duplicates, it will be case sensitive
+        return Err((StatusCode::CONFLICT, "This submission already exists!".to_string()));    
+    }
+
+    Ok(())
+    
+}
+
+
 // This function reads the new meme from the frontend, unwraps the Json format and sends the string to new_meme_to_file
-async fn add_meme(Json(payload): Json<NewMeme>) -> StatusCode {
-   
-    new_meme_to_file(&payload.text).unwrap();
-    StatusCode::CREATED
+async fn add_meme(Json(payload): Json<NewMeme>) -> (StatusCode, String) {
+
+    let text: &str = payload.text.trim();
+
+    // If the meme isn't valid, don't add it to the file and raise error
+    if let Err(error) = validate_meme(text){
+        return error;
+    }
+
+    // If the meme is valid, add it to the file
+    new_meme_to_file(text).unwrap();
+    (StatusCode::CREATED, "Meme submitted!".to_string())
 }
 
 // Adds the submitted meme text to the meme-texts.md file
