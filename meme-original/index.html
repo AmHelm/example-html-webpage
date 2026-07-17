@@ -39,8 +39,7 @@
 
 <script>
 
-// Claude suggestion
-// Checks if user is logged in or not
+// Checks if user is logged in, if not it sends user back to login page
 window.addEventListener("DOMContentLoaded", async () => {
   const response = await fetch("/api/me");
   if (response.status === 401) {

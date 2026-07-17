@@ -80,14 +80,13 @@ fn is_valid(password: &str, stored_hash: &str) -> bool {
     }
 }
 
-// Claude suggestion:
+// Frontend uses this to check if the user is logged in
 async fn me(Extension(user): Extension<String>) -> Json<String> {
-    Json(user)   // only reached if `auth` let the request through
+    Json(user)   
 }
 
 // Useful for cookies: https://github.com/imbolc/tower-cookies/tree/main
 
-// claude:look through this properly
 // Checks if user token matches stored tokens
 async fn auth(
     State(state): State<AppState>,
@@ -110,7 +109,7 @@ async fn auth(
             request.extensions_mut().insert(user); 
             Ok(next.run(request).await)
         }
-        None => Err((StatusCode::UNAUTHORIZED, "Invalid token".to_string())), // Could forward the user to the login page
+        None => Err((StatusCode::UNAUTHORIZED, "Invalid token".to_string())), 
     }
 }
 
