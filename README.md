@@ -67,7 +67,7 @@ Here is a good reference for file handling: https://www.programiz.com/rust/file-
 ## Adding login authentication
 
 To secure the webpage we had added a login authentication method, where there can be multiple users. It should work like this:
-A user submits their usrname and password, which is sent to the backenend through the api/login endpoint. The backend contains a list of users (username + hashed password) and checks the password against a stored hash. 
+A user submits their username and password, which is sent to the backend through the api/login endpoint. The backend contains a list of users (username + hashed password) and checks the password against a stored hash. If it matches the program generates a random token and stores it in the hashmap and sends it to the frontend as a cookie. The middleware can then check the cookie-stored token against the backend hashmap stored token, and chose to proceed or reject user access.
 
 ## Putting the project on the remote server
 
