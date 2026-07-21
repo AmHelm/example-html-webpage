@@ -46,7 +46,7 @@ struct NewMeme {
 // and for middleware auth: https://docs.rs/axum/latest/axum/middleware/index.html 
 
 #[derive(serde::Deserialize)]
-struct LoginInfo{
+struct UserCredentials{
     username: String,
     password: String,
 }
@@ -117,7 +117,7 @@ async fn auth(
 async fn login_user(
     State(state): State<AppState>,
     cookies: Cookies,
-    Json(body): Json<LoginInfo>) -> Result<StatusCode, (StatusCode, String)> {
+    Json(body): Json<UserCredentials>) -> Result<StatusCode, (StatusCode, String)> {
 
     // Message to use if login details are incorrect
     let error_response: String = "Invalid username or password".to_string();
