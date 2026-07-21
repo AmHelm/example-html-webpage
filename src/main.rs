@@ -109,8 +109,6 @@ fn validate_meme(text: &str) -> Result<(), (StatusCode, String)> {
 mod tests{
     use super::*;
 
-use crate::validate_meme;
-
     #[test]
     fn validate_meme__should_return_bad_request_on_empty_strings(){
         let (status, _) = validate_meme("").unwrap_err();
