@@ -1,6 +1,7 @@
 // Backend program that will serve the meme webpage
 
 #![allow(unused)]
+#![allow(non_snake_case)]
 
 use axum::{Router, 
             routing::get, 
@@ -111,26 +112,26 @@ mod tests{
 use crate::validate_meme;
 
     #[test]
-    fn validate_meme_should_return_bad_request_on_empty_strings(){
+    fn validate_meme__should_return_bad_request_on_empty_strings(){
         let (status, _) = validate_meme("").unwrap_err();
         assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 
     #[test]
-    fn validate_meme_should_return_bad_request_on_long_strings(){
+    fn validate_meme__should_return_bad_request_on_long_strings(){
         let too_long_text = "a".repeat(201);
         let (status, _) = validate_meme(&too_long_text).unwrap_err();
         assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 
     #[test]
-    fn validate_meme_should_return_bad_request_on_strings_containing_linebreaks(){
+    fn validate_meme__should_return_bad_request_on_strings_containing_linebreaks(){
         let (status, _) = validate_meme("not\nallowed").unwrap_err();
         assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 
     #[test]
-    fn validate_meme_should_return_ok_on_a_valid_meme(){
+    fn validate_meme__should_return_ok_on_a_valid_meme(){
         assert!(validate_meme("Testing, testing...").is_ok());
     }
 }
