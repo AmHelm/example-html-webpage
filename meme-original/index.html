@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 <head>
     
@@ -11,6 +12,8 @@
     </style>
 </head>
 <body>
+
+    <button type="button" onclick="logout()">Log out</button>
 
 <h1 style="color:palevioletred">Welcome to the Intern Meme Generator!</h1>
 <p>As an intern, I have experienced and learned many new things during my first week. <br>
@@ -36,6 +39,27 @@
 
 <script>
 
+// Checks if user is logged in, if not it sends user back to login page
+window.addEventListener("DOMContentLoaded", async () => {
+  const response = await fetch("/api/me");
+  if (response.status === 401) {
+    window.location.href = "/login.html";
+  }
+});
+
+// Logs out the user and sends them back to the login page
+async function logout() {
+    const url = "/api/logout";
+
+    const response = await fetch(url, {
+        method: "POST" });
+
+    if (!response.ok) {
+            throw new Error(`Response status: ${response.status}`);
+        }
+
+    window.location.href = "/login.html";
+}
 // Fetches the Json wrapped data from backend
 // https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
 async function getMeme() {

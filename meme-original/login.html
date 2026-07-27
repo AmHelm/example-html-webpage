@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <title>Login</title>
+    <style>
+    body {background-color:rgb(231, 246, 221);}
+    h1 {text-align: center;}
+    h3 {text-align: center;}
+    p {text-align: center;}
+    div {text-align: center;}
+    </style>
+</head>
+
+<body>
+    
+<h1 style="color:palevioletred">Welcome to the Intern Meme Generator!</h1>
+
+<div>
+    <label for="newmeme">Login please</label><br>
+    <input type="text" id="username" placeholder="Username"><br>
+    <input type="password" id="password" placeholder="Password"><br>
+    <button type="button" onclick="login()">Take me to the memes!</button>
+</div>
+
+<script>
+
+// Error messages come from the backend
+async function login() {
+
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+
+    const url = "/api/login";
+
+    try {
+        // fetch uses GET by default, here we have to specify POST
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({username, password})
+        });
+
+        const message = await response.text();
+
+        if (!response.ok) {
+            alert(message);
+            return;
+        }
+
+        window.location.href = "/index.html";
+    } 
+
+    catch (error) {
+        console.error(error.message);
+    }
+
+}
+
+
+</script>
+
+</body>
