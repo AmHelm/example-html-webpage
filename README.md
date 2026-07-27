@@ -64,6 +64,11 @@ The NewMeme struct tells the program what the format of the memes will be. It al
 The add_meme() function then inputs the data into the new_meme_to_file() function, where the data is added to the meme-text.md file. writeln!() adds the text in a new line, which is important since the program read the file line-by-line in read_memes_from_file().
 Here is a good reference for file handling: https://www.programiz.com/rust/file-handling
 
+## Adding login authentication
+
+To secure the webpage we had added a login authentication method, where there can be multiple users. It should work like this:
+A user submits their username and password, which is sent to the backend through the api/login endpoint. The backend contains a list of users (username + hashed password) and checks the password against a stored hash. If it matches the program generates a random token and stores it in the hashmap and sends it to the frontend as a cookie. The middleware can then check the cookie-stored token against the backend hashmap stored token, and chose to proceed or reject user access.
+
 ## Putting the project on the remote server
 
 When the code is ready, put it in the remote server, go to the server and run it. 

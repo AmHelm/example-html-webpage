@@ -2,23 +2,28 @@
 
 #![allow(unused)]
 
-use axum::{Router, 
-            routing::get, 
-            routing::post, 
-            Json,
-            http::StatusCode};
+use axum::{Json, Router, extract::{Extension, Request, State}, 
+            http::StatusCode, middleware::{self, Next}, 
+            response::{IntoResponse, Response}, 
+            routing::{Route, get, post}};
 use tower_http::services::{ServeDir, 
                             ServeFile};
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::fs::{File, 
                 OpenOptions};
 use std::io::{BufReader, 
-                BufRead, 
-                Write};
+                BufRead, Write};
 use std::io;
-use rand::{Rng, 
-            seq::IndexedRandom};
+use rand::{Rng, distr::Alphanumeric, 
+            seq::IndexedRandom, RngExt};
 use serde::Deserialize;
+use argon2::{Argon2, PasswordHash, 
+                PasswordHasher, PasswordVerifier};
+use argon2::password_hash::{SaltString, rand_core::OsRng};
+use std::sync::{Arc, Mutex};
+use tower_cookies::{Cookie, CookieManagerLayer, Cookies}; 
+
 
 // Which port we want the website to claim
 const PORT: u16 = 3000;
@@ -35,6 +40,120 @@ const MEME_TEXTS: &str = "meme-texts.md";
 #[derive(serde::Deserialize)]
 struct NewMeme {
     text: String,
+}
+
+// This was userful for login auth: https://github.com/wpcodevo/rust-axum-jwt-auth/blob/master/src/handler.rs
+// and for middleware auth: https://docs.rs/axum/latest/axum/middleware/index.html 
+
+#[derive(serde::Deserialize)]
+struct UserCredentials{
+    username: String,
+    password: String,
+}
+
+// Shares data across handlers
+// Arc: lets multiple owners share the same data
+// Mutex: Allows for dafe modification of shared data
+#[derive(Clone)]
+struct AppState {
+    users: Arc<HashMap<String, String>>,
+    tokens: Arc<Mutex<HashMap<String, String>>>,
+}
+
+// Handler for salting and then hashing password
+// Salting: random chunk of data that is added to a password before hashing it 
+fn hash_password(password: &str) -> String {
+    let salt = SaltString::generate(&mut OsRng);
+    Argon2::default()
+        .hash_password(password.as_bytes(), &salt)
+        .unwrap().to_string()
+}
+
+// Handler for verifying password
+// Checks that the stored hash is the same as the submitted password
+fn is_valid(password: &str, stored_hash: &str) -> bool {
+    match PasswordHash::new(stored_hash) {
+        Ok(parsed_hash) => Argon2::default()
+            .verify_password(password.as_bytes(), &parsed_hash)
+            .is_ok(),
+        Err(_) => false,
+    }
+}
+
+// Frontend uses this to check if the user is logged in
+async fn me(Extension(user): Extension<String>) -> Json<String> {
+    Json(user)   
+}
+
+// Useful for cookies: https://github.com/imbolc/tower-cookies/tree/main
+
+// Checks if user token matches stored tokens
+async fn auth(
+    State(state): State<AppState>,
+    cookies: Cookies,
+    mut request: Request,     
+    next: Next,
+) -> Result<Response, (StatusCode, String)> {
+    // 
+    let token = cookies
+        .get("auth_token")
+        .map(|c| c.value().to_string())
+        .ok_or((StatusCode::UNAUTHORIZED, "Not logged in".to_string()))?;
+
+    // Retrieves the username associated with this token
+    let username = state.tokens.lock().unwrap().get(&token).cloned();
+
+    // Checks if token matches a stored user token, either accepts or rejects letting the user through
+    match username {
+        Some(user) => {
+            request.extensions_mut().insert(user); 
+            Ok(next.run(request).await)
+        }
+        None => Err((StatusCode::UNAUTHORIZED, "Invalid token".to_string())), 
+    }
+}
+
+// Login function
+async fn login_user(
+    State(state): State<AppState>,
+    cookies: Cookies,
+    Json(body): Json<UserCredentials>) -> Result<StatusCode, (StatusCode, String)> {
+
+    // Message to use if login details are incorrect
+    let error_response: String = "Invalid username or password".to_string();
+
+    // Looks up the stores password for this username
+    let stored_hash = state.users.get(&body.username).ok_or((StatusCode::UNAUTHORIZED, error_response.clone()))?;
+
+    // Passes the submitted password and stored hash to handler for a validity check 
+    if !is_valid(&body.password, stored_hash) {
+        return Err((StatusCode::UNAUTHORIZED, error_response));
+    }
+
+    // Generate a random token
+    let token: String = rand::rng().sample_iter(&Alphanumeric).take(50).map(char::from).collect();
+    
+    // Inserts token into AppState struct
+    state.tokens.lock().unwrap().insert(token.clone(), body.username.clone());
+
+    // Store token as cookie
+    let mut cookie = Cookie::new("auth_token", token);
+    cookie.set_path("/");
+    cookies.add(cookie);
+
+    Ok(StatusCode::OK)
+}
+
+// Handler to log out user
+async fn logout_user(State(state): State<AppState>, cookies: Cookies) -> StatusCode {
+    // Read token from "auth_token" cookie
+    // If there is a cookie, remove it from AppState
+    if let Some(cookie) = cookies.get("auth_token") {
+        state.tokens.lock().unwrap().remove(cookie.value());
+    }
+    // Remove cookie from browser
+    cookies.remove(Cookie::new("auth_token", ""));
+    StatusCode::OK
 }
 
 // Function that reads a file containing strings and returns a list
@@ -57,7 +176,6 @@ fn read_memes_from_file() -> io::Result<Vec<String>> {
 
     // If no error, return the vector containing all the text lines
     Ok(lines)
-
 }
 
 // Gets the meme texts and randomizes one of them
@@ -103,7 +221,6 @@ fn validate_meme(text: &str) -> Result<(), (StatusCode, String)> {
     
 }
 
-
 // This function reads the new meme from the frontend, unwraps the Json format and sends the string to new_meme_to_file
 async fn add_meme(Json(payload): Json<NewMeme>) -> (StatusCode, String) {
 
@@ -112,6 +229,7 @@ async fn add_meme(Json(payload): Json<NewMeme>) -> (StatusCode, String) {
     // If the meme isn't valid, don't add it to the file and raise error
     if let Err(error) = validate_meme(text){
         return error;
+
     }
 
     // If the meme is valid, add it to the file
@@ -133,9 +251,18 @@ fn new_meme_to_file(text: &str) -> io::Result<()> {
     Ok(())
 }
 
-
 #[tokio::main]
 async fn main(){
+
+    let mut users = HashMap::new();
+    users.insert("amanda".to_string(), hash_password("1234"));
+
+     
+    let state = AppState{
+        users: Arc::new(users),
+        tokens: Arc::new(Mutex::new(HashMap::new())),
+    };
+    
 
     let file_path = format!("{DIR_PATH}/{FILE_NAME}");
 
@@ -144,10 +271,25 @@ async fn main(){
                                                     .not_found_service(ServeFile::new(file_path));
 
     // Initialize the router
+    // Reachable before entering credentials
+    let public = Router::new()
+        .route("/api/login", post(login_user))
+        .route("/api/logout", post(logout_user));
+        
+    // Reachable after logging in
+    let protected = Router::new()
+        .route("/api/add_meme", post(add_meme))
+        .route("/api/get_random_meme", get(get_random_meme))
+        .route("/api/me", get(me))
+        .route_layer(middleware::from_fn_with_state(state.clone(), auth));
+
+    // Merges the routes
     let app = Router::new()
-                      .route("/api/get_random_meme", get(get_random_meme))
-                      .route("/api/add_meme", post(add_meme)) // Get the new memes that have been submitted in the frontend
-                      .fallback_service(serve_dir);
+        .merge(public)
+        .merge(protected)
+        .fallback_service(serve_dir)
+        .layer(CookieManagerLayer::new())  
+        .with_state(state);
 
     // Network adress: IP-adress + port
     // 0.0.0.0 to be reachable from outside
