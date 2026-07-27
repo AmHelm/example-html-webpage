@@ -64,6 +64,14 @@ The NewMeme struct tells the program what the format of the memes will be. It al
 The add_meme() function then inputs the data into the new_meme_to_file() function, where the data is added to the meme-text.md file. writeln!() adds the text in a new line, which is important since the program read the file line-by-line in read_memes_from_file().
 Here is a good reference for file handling: https://www.programiz.com/rust/file-handling
 
+## Unit testing
+
+It is good pactice to test your functions, making sure that they actually perform their tasks correctly. Unit testing has been added for the validate_meme() function, checking if the StatusCodes are being returned in the way intended.The tests check that BAD_REQUEST is being sent for invalid submissions and there is a happy-case test checking if it works for valid submissions. To run the tests, simply enter
+```bash
+cargo test
+```
+into the terminal and make sure the tests pass.
+
 ## Adding login authentication
 
 To secure the webpage we had added a login authentication method, where there can be multiple users. It should work like this:

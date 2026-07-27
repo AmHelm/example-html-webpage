@@ -1,6 +1,7 @@
 // Backend program that will serve the meme webpage
 
 #![allow(unused)]
+#![allow(non_snake_case)]
 
 use axum::{Json, Router, extract::{Extension, Request, State}, 
             http::StatusCode, middleware::{self, Next}, 
@@ -219,6 +220,35 @@ fn validate_meme(text: &str) -> Result<(), (StatusCode, String)> {
 
     Ok(())
     
+}
+// Unit tests for validate_meme()
+#[cfg(test)]
+mod tests{
+    use super::*;
+
+    #[test]
+    fn validate_meme__should_return_bad_request_on_empty_strings(){
+        let (status, _) = validate_meme("").unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn validate_meme__should_return_bad_request_on_long_strings(){
+        let too_long_text = "a".repeat(201);
+        let (status, _) = validate_meme(&too_long_text).unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn validate_meme__should_return_bad_request_on_strings_containing_linebreaks(){
+        let (status, _) = validate_meme("not\nallowed").unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn validate_meme__should_return_ok_on_a_valid_meme(){
+        assert!(validate_meme("Testing, testing...").is_ok());
+    }
 }
 
 // This function reads the new meme from the frontend, unwraps the Json format and sends the string to new_meme_to_file
