@@ -77,6 +77,10 @@ into the terminal and make sure the tests pass.
 To secure the webpage we had added a login authentication method, where there can be multiple users. It should work like this:
 A user submits their username and password, which is sent to the backend through the api/login endpoint. The backend contains a list of users (username + hashed password) and checks the password against a stored hash. If it matches the program generates a random token and stores it in the hashmap and sends it to the frontend as a cookie. The middleware can then check the cookie-stored token against the backend hashmap stored token, and chose to proceed or reject user access.
 
+## Splitting program into separate modules
+
+By now, the program has expanded quite a bit. To keep things tidy and readable we have split the program and put handlers into separate modules. For example, auth_handlers.rs contains all helper functions used for user login authentication. To make sure that the main program can still access and use these handlers they have been made public by adding the pub keyword in front of all functions and structs.
+
 ## Putting the project on the remote server
 
 When the code is ready, put it in the remote server, go to the server and run it. 
