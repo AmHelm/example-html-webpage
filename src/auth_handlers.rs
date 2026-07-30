@@ -1,24 +1,11 @@
-use axum::{Json, Router, extract::{Extension, Request, State}, 
-            http::StatusCode, middleware::{self, Next}, 
-            response::{IntoResponse, Response}, 
-            routing::{Route, get, post}};
-use tower_http::services::{ServeDir, 
-                            ServeFile};
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::fs::{File, 
-                OpenOptions};
-use std::io::{BufReader, 
-                BufRead, Write};
-use std::io;
-use rand::{Rng, distr::Alphanumeric, 
-            seq::IndexedRandom, RngExt};
-use serde::Deserialize;
+use axum::{Json, extract::{Extension, Request, State}, 
+            http::StatusCode, middleware::Next, 
+            response::Response};
+use rand::{distr::Alphanumeric, RngExt};
 use argon2::{Argon2, PasswordHash, 
                 PasswordHasher, PasswordVerifier};
 use argon2::password_hash::{SaltString, rand_core::OsRng};
-use std::sync::{Arc, Mutex};
-use tower_cookies::{Cookie, CookieManagerLayer, Cookies}; 
+use tower_cookies::{Cookie, Cookies}; 
 
 use crate::AppState;
 

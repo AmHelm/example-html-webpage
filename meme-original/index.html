@@ -72,7 +72,7 @@ async function getMeme() {
         }
 
         const meme = await response.json();
-        document.getElementById("demo").innerHTML = meme;
+        document.getElementById("demo").innerHTML = meme.text;
     } 
     catch (error) {
         console.error(error.message);
