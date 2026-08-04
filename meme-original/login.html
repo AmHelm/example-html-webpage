@@ -17,10 +17,17 @@
 <h1 style="color:palevioletred">Welcome to the Intern Meme Generator!</h1>
 
 <div>
-    <label for="newmeme">Login please</label><br>
+    <label for="login">Login please</label><br>
     <input type="text" id="username" placeholder="Username"><br>
     <input type="password" id="password" placeholder="Password"><br>
     <button type="button" onclick="login()">Take me to the memes!</button>
+</div>
+
+<div>
+    <label for="newuser">Register new user</label><br>
+    <input type="text" id="newusername" placeholder="New Username"><br>
+    <input type="password" id="newpassword" placeholder="New Password"><br>
+    <button type="button" onclick="login()">Register me!</button>
 </div>
 
 <script>
@@ -55,6 +62,35 @@ async function login() {
         console.error(error.message);
     }
 
+}
+
+async function register_user() {
+    const newusername = document.getElementById("newusername").value;
+    const newpassword = document.getElementById("newpassword").value;
+
+    const url = "/api/register";
+
+    try {
+        // fetch uses GET by default, here we have to specify POST
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({newusername, newpassword})
+        });
+
+        const message = await response.text();
+
+        if (!response.ok) {
+            alert(message);
+            return;
+        }
+
+        window.location.href = "/login.html";
+    } 
+
+    catch (error) {
+        console.error(error.message);
+    }
 }
 
 

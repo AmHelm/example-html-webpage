@@ -4,8 +4,9 @@
 
 mod auth_handlers;
 mod meme_handlers;
+mod users_handlers;
 
-use axum::{Router, middleware::self, 
+use axum::{Router, middleware::{self}, 
             routing::{get, post}};
 use tower_http::services::{ServeDir, 
                             ServeFile};
@@ -13,12 +14,14 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tower_cookies::CookieManagerLayer; 
-use auth_handlers::{hash_password, me, 
+use auth_handlers::{me, 
                     auth, login_user, logout_user};
 use sqlx::sqlite::{ SqlitePool, 
             SqliteConnectOptions, SqlitePoolOptions};
 use std::str::FromStr;
 use meme_handlers::{create_meme_table, get_random_meme, add_meme};
+
+use crate::users_handlers::create_users_table;
 
 // Which port we want the website to claim
 const PORT: u16 = 3000;
@@ -35,7 +38,6 @@ const FILE_NAME: &str = "index.html";
 // Mutex: Allows for dafe modification of shared data
 #[derive(Clone)]
 struct AppState {
-    users: Arc<HashMap<String, String>>,
     tokens: Arc<Mutex<HashMap<String, String>>>,
     db: SqlitePool,
 }
@@ -58,13 +60,13 @@ async fn main(){
 
     let pool = init_db().await;
     create_meme_table(&pool).await;
+    create_users_table(&pool).await;
 
     let mut users = HashMap::new();
-    users.insert("amanda".to_string(), hash_password("1234"));
+   
 
      
     let state = AppState{
-        users: Arc::new(users),
         tokens: Arc::new(Mutex::new(HashMap::new())),
         db: pool,
     };
