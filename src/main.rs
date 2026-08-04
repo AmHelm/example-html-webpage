@@ -57,6 +57,7 @@ async fn init_db() -> SqlitePool {
 #[tokio::main]
 async fn main(){
 
+    // Initiates database and creates tables for memes and users
     let pool = init_db().await;
     create_meme_table(&pool).await;
     create_users_table(&pool).await;
@@ -86,7 +87,7 @@ async fn main(){
         .route("/api/me", get(me))
         .route_layer(middleware::from_fn_with_state(state.clone(), auth));
 
-    // Merges the routes
+    // Merges the public and private routes
     let app = Router::new()
         .merge(public)
         .merge(protected)

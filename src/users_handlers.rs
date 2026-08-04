@@ -7,6 +7,7 @@ use sqlx::{FromRow, sqlite::SqlitePool};
 
 use crate::{AppState, auth_handlers::hash_password};
 
+// Struct for new users for registration
 #[derive(Deserialize)]
 pub struct NewUser {
     pub username: String,
@@ -50,7 +51,7 @@ pub async fn get_user_from_username(
     .await
 }
 
-// To register users and add them to the users database table 
+// Registers users and adds them to the users database table 
 pub async fn register_user(
     State(state): State<AppState>,
     Json(payload): Json<NewUser>,
@@ -62,6 +63,7 @@ pub async fn register_user(
     // Check that user credentials are valid before storing
     validate_user_credentials(&username, &password)?;
 
+    // Salts and hashes password 
     let password_hash = hash_password(&password);
 
     let result = sqlx::query("INSERT INTO users (username, password_hash) VALUES (?, ?)")
@@ -71,7 +73,10 @@ pub async fn register_user(
     .await;
 
     match result {
+        
         Ok(_) => Ok((StatusCode::CREATED, "User registered!".to_string())),
+
+        //Checks for duplicate usernames
         Err(e) => {
             if e.as_database_error().is_some_and(|db_err| db_err.is_unique_violation()) {
                 Err((StatusCode::CONFLICT, "This user already exists!".to_string()))
@@ -85,6 +90,8 @@ pub async fn register_user(
 }
 
 // Checks if the username and password that has been entered are valid before registering them
+// Checks if the username or password is empty, is over/under a max/min limit of characters
+//  contains a linebreak or uses invalid character types
 pub fn validate_user_credentials(
     username: &str,
     password: &str,
@@ -92,21 +99,23 @@ pub fn validate_user_credentials(
 
     let max_length_username: usize = 30;
 
-    // Checks if the submission is empty, is over a max limit of characters, contains a linebreak or is a duplicate
+    // Checks if username is empty
     if username.is_empty() {
         return Err((StatusCode::BAD_REQUEST, "Username cannot be empty!".to_string()));
     }
     
+    // Allowed maximum number of characters for a username
     if username.chars().count() > max_length_username {
         let message = format!("Username cannot be more than {max_length_username} characters!");
         return Err((StatusCode::BAD_REQUEST, message));
     }
 
+    // Checks if username contains a line-break
     if username.contains("\n") || username.contains("\r") {
         return Err((StatusCode::BAD_REQUEST, "Username cannot have line-breaks!".to_string()));
     }
 
-    // Allowed characters
+    // Allowed characters types 
     if !username.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.') {
         return Err((StatusCode::BAD_REQUEST, "Username can only contain letters, numbers, underscores and periods!".to_string()));
     }
@@ -114,16 +123,19 @@ pub fn validate_user_credentials(
     let max_length_password: usize = 100;
     let min_length_password: usize = 8;
 
+    // Checks if password is empty
     if password.is_empty() {
         return Err((StatusCode::BAD_REQUEST, "Password cannot be empty!".to_string()));
     }
     
+    // Allowed maximum/minimum number of characters for a password
     if password.chars().count() > max_length_password || password.chars().count() < min_length_password {
         let message = format!("Password needs to have at least {min_length_password}\
                                         characters and cannot be more than {max_length_password} characters!");
         return Err((StatusCode::BAD_REQUEST, message));
     }
 
+    // Checks if username contains a line-break
     if password.contains("\n") || password.contains("\r") {
         return Err((StatusCode::BAD_REQUEST, "Password cannot have line-breaks!".to_string()));
     }
