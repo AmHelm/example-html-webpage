@@ -85,6 +85,10 @@ The example webpage now has user registration, where new users can be added and 
 
 By now, the program has expanded quite a bit. To keep things tidy and readable we have split the program and put handlers into separate modules. For example, auth_handlers.rs contains all helper and handler functions used for user login authentication. To make sure that the main program can still access and use these handlers they have been made public by adding the pub keyword in front of all functions and structs.
 
+## Splitting program into separate modules
+
+By now, the program has expanded quite a bit. To keep things tidy and readable we have split the program and put handlers into separate modules. For example, auth_handlers.rs contains all helper functions used for user login authentication. To make sure that the main program can still access and use these handlers they have been made public by adding the pub keyword in front of all functions and structs.
+
 ## Putting the project on the remote server
 
 When the code is ready, put it in the remote server, go to the server and run it. 
