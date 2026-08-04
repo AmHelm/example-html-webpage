@@ -1,33 +1,24 @@
 // Backend program that will serve the meme webpage
 
-#![allow(unused)]
 #![allow(non_snake_case)]
 
 mod auth_handlers;
 
-use axum::{Json, Router, extract::{Extension, Request, State}, 
-            http::StatusCode, middleware::{self, Next}, 
-            response::{IntoResponse, Response}, 
-            routing::{Route, get, post}};
+use axum::{Json, Router, extract::State, 
+            http::StatusCode, middleware::self, 
+            routing::{get, post}};
 use tower_http::services::{ServeDir, 
                             ServeFile};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::fs::{File, 
-                OpenOptions};
-use std::io::{BufReader, 
-                BufRead, Write};
-use std::io;
-use rand::{Rng, distr::Alphanumeric, 
-            seq::IndexedRandom, RngExt};
-use serde::Deserialize;
-use argon2::{Argon2, PasswordHash, 
-                PasswordHasher, PasswordVerifier};
-use argon2::password_hash::{SaltString, rand_core::OsRng};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use tower_cookies::{Cookie, CookieManagerLayer, Cookies}; 
-use auth_handlers::{hash_password, is_valid, me, 
+use tower_cookies::CookieManagerLayer; 
+use auth_handlers::{hash_password, me, 
                     auth, login_user, logout_user};
+use sqlx::{FromRow, sqlite::{ SqlitePool, 
+            SqliteConnectOptions, SqlitePoolOptions}};
+use std::str::FromStr;
 
 // Which port we want the website to claim
 const PORT: u16 = 3000;
@@ -36,13 +27,16 @@ const PORT: u16 = 3000;
 const DIR_PATH: &str = "meme-original";
 const FILE_NAME: &str = "index.html";
 
-// The name of the text file we want to read
-const MEME_TEXTS: &str = "meme-texts.md";
-
 // Struct for the incoming new memes from the frontend
 // serde deserializes the code (unwraps the Json format)
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct NewMeme {
+    text: String,
+}
+
+#[derive(Serialize, FromRow)]
+struct Meme {
+    id: i64,
     text: String,
 }
 
@@ -56,42 +50,46 @@ struct NewMeme {
 struct AppState {
     users: Arc<HashMap<String, String>>,
     tokens: Arc<Mutex<HashMap<String, String>>>,
+    db: SqlitePool,
 }
 
-// Function that reads a file containing strings and returns a list
-fn read_memes_from_file() -> io::Result<Vec<String>> {
+async fn init_db() -> SqlitePool {
+    let options = SqliteConnectOptions::from_str("sqlite:memes.db")
+        .unwrap()
+        .create_if_missing(true);
 
-    // Read the file
-    let file = File::open(MEME_TEXTS).unwrap();
+    SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect_with(options)
+        .await
+        .unwrap()
+}
 
-    // BufReader lets us read the file line by line
-    let reader = BufReader::new(file);
+async fn create_table(pool: &SqlitePool) {
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS memes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            text TEXT NOT NULL UNIQUE
+        )",
+    )
+    .execute(pool)
+    .await
+    .unwrap();
+}
 
-    // Make a vector to contain the text lines
-    let mut lines: Vec<String>   = Vec::new();
+async fn get_random_meme(State(state): State<AppState>) -> Result<Json<Meme>,StatusCode> {
+    let one_meme = sqlx::query_as::<_,Meme>(
+        "SELECT id, text FROM memes ORDER BY RANDOM() LIMIT 1"
+    )
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|e| {eprintln!("db read failed: {e}"); 
+    StatusCode::INTERNAL_SERVER_ERROR})?;
 
-    // Add each text line into a vector
-    for line in reader.lines() {
-        let line = line?;
-        lines.push(line);
+    match one_meme{
+        Some(meme) => Ok(Json(meme)),
+        None => Err(StatusCode::NOT_FOUND),
     }
-
-    // If no error, return the vector containing all the text lines
-    Ok(lines)
-}
-
-// Gets the meme texts and randomizes one of them
-// Sends off the meme string in Json format
-async fn get_random_meme() -> Json<String> {
-    
-    let memes = read_memes_from_file().unwrap();
-
-    // Randomizer
-    let mut rng = rand::rng();
-    let random_meme = memes.choose(&mut rng).unwrap().to_string();
-
-    // Wrap the text files into Json format
-    Json(random_meme)
 }
 
 // This function checks if the submission is valid (no empty submissions, max limit, no line-breaks and no duplicates)
@@ -111,12 +109,6 @@ fn validate_meme(text: &str) -> Result<(), (StatusCode, String)> {
 
     if text.contains("\n") || text.contains("\r") {
         return Err((StatusCode::BAD_REQUEST, "Submission cannot have line-breaks!".to_string()));
-    }
-
-    let memes = read_memes_from_file().unwrap();
-    // This was helpful here: https://sts10.github.io/2019/06/06/is-all-equal-function.html
-    if memes.iter().any(|meme| meme == text){ // Checks for exact duplicates, it will be case sensitive
-        return Err((StatusCode::CONFLICT, "This submission already exists!".to_string()));    
     }
 
     Ok(())
@@ -152,38 +144,39 @@ mod tests{
     }
 }
 
-// This function reads the new meme from the frontend, unwraps the Json format and sends the string to new_meme_to_file
-async fn add_meme(Json(payload): Json<NewMeme>) -> (StatusCode, String) {
+async fn add_meme(
+    State(state): State<AppState>,
+    Json(payload): Json<NewMeme>,
+) -> Result<(StatusCode, String), (StatusCode, String)> {
+    
+    let text: String = payload.text.trim().to_string();
+    
+    validate_meme(&text)?;
 
-    let text: &str = payload.text.trim();
+    let result = sqlx::query("INSERT INTO memes (text) VALUES (?)")
+    .bind(&text)
+    .execute(&state.db)
+    .await;
 
-    // If the meme isn't valid, don't add it to the file and raise error
-    if let Err(error) = validate_meme(text){
-        return error;
-
+    match result {
+        Ok(_) => Ok((StatusCode::CREATED, "Meme submitted!".to_string())),
+        Err(e) => {
+            if e.as_database_error().is_some_and(|db_err| db_err.is_unique_violation()) {
+                Err((StatusCode::CONFLICT, "This submission already exists!".to_string()))
+            }
+            else {
+                eprintln!("db insert failed: {e}");
+                Err((StatusCode::INTERNAL_SERVER_ERROR, "Could not save meme!".to_string()))
+            }
+        }
     }
-
-    // If the meme is valid, add it to the file
-    new_meme_to_file(text).unwrap();
-    (StatusCode::CREATED, "Meme submitted!".to_string())
-}
-
-// Adds the submitted meme text to the meme-texts.md file
-// https://www.programiz.com/rust/file-handling
-fn new_meme_to_file(text: &str) -> io::Result<()> {
-
-    // Open a file with append option
-    let mut meme_file = OpenOptions::new()
-        .append(true)
-        .open(MEME_TEXTS)?;
-
-    // Write to a file on a new line
-    writeln!(meme_file, "{text}")?;
-    Ok(())
 }
 
 #[tokio::main]
 async fn main(){
+
+    let pool = init_db().await;
+    create_table(&pool).await;
 
     let mut users = HashMap::new();
     users.insert("amanda".to_string(), hash_password("1234"));
@@ -192,6 +185,7 @@ async fn main(){
     let state = AppState{
         users: Arc::new(users),
         tokens: Arc::new(Mutex::new(HashMap::new())),
+        db: pool,
     };
     
 
