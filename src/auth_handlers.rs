@@ -79,13 +79,13 @@ pub async fn login_user(
     let error_fail: String = "Login failed".to_string();
 
     // Looks up the stores password for this username
-    let stored_password_hash = crate::users_handlers::get_user_from_username(&state.db, &body.username)
+    let user = get_user_from_username(&state.db, &body.username)
         .await
-        .map_err(|e| {eprintln!("db read failed: {e}"); StatusCode::INTERNAL_SERVER_ERROR, error_fail})?
+        .map_err(|e| {eprintln!("db read failed: {e}"); (StatusCode::INTERNAL_SERVER_ERROR, error_fail)})?
         .ok_or((StatusCode::UNAUTHORIZED, error_invalid.clone()))?;
 
     // Passes the submitted password and stored hash to handler for a validity check 
-    if !is_valid(&body.password, &user.stored_password_hash) {
+    if !is_valid(&body.password, &user.password_hash) {
         return Err((StatusCode::UNAUTHORIZED, error_invalid));
     }
 

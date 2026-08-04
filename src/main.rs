@@ -14,14 +14,13 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tower_cookies::CookieManagerLayer; 
-use auth_handlers::{me, 
-                    auth, login_user, logout_user};
+use auth_handlers::{me, auth, login_user, logout_user};
 use sqlx::sqlite::{ SqlitePool, 
             SqliteConnectOptions, SqlitePoolOptions};
 use std::str::FromStr;
 use meme_handlers::{create_meme_table, get_random_meme, add_meme};
 
-use crate::users_handlers::create_users_table;
+use crate::users_handlers::{create_users_table, register_user};
 
 // Which port we want the website to claim
 const PORT: u16 = 3000;
@@ -49,7 +48,7 @@ async fn init_db() -> SqlitePool {
         .create_if_missing(true);
 
     SqlitePoolOptions::new()
-        .max_connections(5)
+        .max_connections(10)
         .connect_with(options)
         .await
         .unwrap()
@@ -61,16 +60,11 @@ async fn main(){
     let pool = init_db().await;
     create_meme_table(&pool).await;
     create_users_table(&pool).await;
-
-    let mut users = HashMap::new();
-   
-
      
     let state = AppState{
         tokens: Arc::new(Mutex::new(HashMap::new())),
         db: pool,
     };
-    
 
     let file_path = format!("{DIR_PATH}/{FILE_NAME}");
 
@@ -82,7 +76,8 @@ async fn main(){
     // Reachable before entering credentials
     let public = Router::new()
         .route("/api/login", post(login_user))
-        .route("/api/logout", post(logout_user));
+        .route("/api/logout", post(logout_user))
+        .route("/api/register", post(register_user));
         
     // Reachable after logging in
     let protected = Router::new()

@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![allow(dead_code)] //For id field in User struct
 
 use axum::{Json, extract::State, http::StatusCode};
 use serde::{Deserialize};
@@ -118,8 +119,8 @@ pub fn validate_user_credentials(
     }
     
     if password.chars().count() > max_length_password || password.chars().count() < min_length_password {
-        let message = format!("Password needs to have at least {min_length_password} 
-                            characters and cannot be more than {max_length_password} characters!");
+        let message = format!("Password needs to have at least {min_length_password}\
+                                        characters and cannot be more than {max_length_password} characters!");
         return Err((StatusCode::BAD_REQUEST, message));
     }
 
@@ -130,7 +131,7 @@ pub fn validate_user_credentials(
     Ok(())
 }
 
-// Unit tests for validate_meme()
+// Unit tests for validate_user_credentials()
 #[cfg(test)]
 mod tests{
     use super::*;
@@ -152,13 +153,38 @@ mod tests{
     }
 
     #[test]
+    fn validate_user_credentials__should_return_bad_request_on_usernames_containing_wrong_characters(){
+        let (status, _) = validate_user_credentials("Amanda!", VALID_PASSWORD).unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
     fn validate_user_credentials__should_return_bad_request_on_usernames_containing_linebreaks(){
         let (status, _) = validate_user_credentials("not\nallowed", VALID_PASSWORD).unwrap_err();
         assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 
     #[test]
-    fn validate_user_credentials__should_return_ok_on_a_valid_meme(){
+    fn validate_user_credentials__should_return_bad_request_on_long_passwords(){
+        let too_long_password = "a".repeat(101);
+        let (status, _) = validate_user_credentials(VALID_USERNAME, &too_long_password).unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn validate_user_credentials__should_return_bad_request_on_short_passwords(){
+        let (status, _) = validate_user_credentials(VALID_USERNAME, "short1").unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn validate_user_credentials__should_return_bad_request_on_passwords_containing_linebreaks(){
+        let (status, _) = validate_user_credentials(VALID_USERNAME, "not\nallowed12345").unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn validate_user_credentials__should_return_ok_on_a_valid_credentials(){
         assert!(validate_user_credentials(VALID_USERNAME,VALID_PASSWORD).is_ok());
     }
 }
