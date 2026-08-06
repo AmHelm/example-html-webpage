@@ -4,8 +4,9 @@
 
 mod auth_handlers;
 mod meme_handlers;
+mod users_handlers;
 
-use axum::{Router, middleware::self, 
+use axum::{Router, middleware::{self}, 
             routing::{get, post}};
 use tower_http::services::{ServeDir, 
                             ServeFile};
@@ -13,12 +14,13 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tower_cookies::CookieManagerLayer; 
-use auth_handlers::{hash_password, me, 
-                    auth, login_user, logout_user};
+use auth_handlers::{me, auth, login_user, logout_user};
 use sqlx::sqlite::{ SqlitePool, 
             SqliteConnectOptions, SqlitePoolOptions};
 use std::str::FromStr;
 use meme_handlers::{create_meme_table, get_random_meme, add_meme};
+
+use crate::users_handlers::{create_users_table, register_user};
 
 // Which port we want the website to claim
 const PORT: u16 = 3000;
@@ -35,7 +37,6 @@ const FILE_NAME: &str = "index.html";
 // Mutex: Allows for dafe modification of shared data
 #[derive(Clone)]
 struct AppState {
-    users: Arc<HashMap<String, String>>,
     tokens: Arc<Mutex<HashMap<String, String>>>,
     db: SqlitePool,
 }
@@ -47,7 +48,7 @@ async fn init_db() -> SqlitePool {
         .create_if_missing(true);
 
     SqlitePoolOptions::new()
-        .max_connections(5)
+        .max_connections(10)
         .connect_with(options)
         .await
         .unwrap()
@@ -56,19 +57,15 @@ async fn init_db() -> SqlitePool {
 #[tokio::main]
 async fn main(){
 
+    // Initiates database and creates tables for memes and users
     let pool = init_db().await;
     create_meme_table(&pool).await;
-
-    let mut users = HashMap::new();
-    users.insert("amanda".to_string(), hash_password("1234"));
-
+    create_users_table(&pool).await;
      
     let state = AppState{
-        users: Arc::new(users),
         tokens: Arc::new(Mutex::new(HashMap::new())),
         db: pool,
     };
-    
 
     let file_path = format!("{DIR_PATH}/{FILE_NAME}");
 
@@ -80,7 +77,8 @@ async fn main(){
     // Reachable before entering credentials
     let public = Router::new()
         .route("/api/login", post(login_user))
-        .route("/api/logout", post(logout_user));
+        .route("/api/logout", post(logout_user))
+        .route("/api/register", post(register_user));
         
     // Reachable after logging in
     let protected = Router::new()
@@ -89,7 +87,7 @@ async fn main(){
         .route("/api/me", get(me))
         .route_layer(middleware::from_fn_with_state(state.clone(), auth));
 
-    // Merges the routes
+    // Merges the public and private routes
     let app = Router::new()
         .merge(public)
         .merge(protected)

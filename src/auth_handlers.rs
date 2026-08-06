@@ -7,7 +7,7 @@ use argon2::{Argon2, PasswordHash,
 use argon2::password_hash::{SaltString, rand_core::OsRng};
 use tower_cookies::{Cookie, Cookies}; 
 
-use crate::AppState;
+use crate::{AppState, users_handlers::get_user_from_username};
 
 #[derive(serde::Deserialize)]
 pub struct UserCredentials{
@@ -75,21 +75,25 @@ pub async fn login_user(
     Json(body): Json<UserCredentials>) -> Result<StatusCode, (StatusCode, String)> {
 
     // Message to use if login details are incorrect
-    let error_response: String = "Invalid username or password".to_string();
+    let error_invalid: String = "Invalid username or password".to_string();
+    let error_fail: String = "Login failed".to_string();
 
     // Looks up the stores password for this username
-    let stored_hash = state.users.get(&body.username).ok_or((StatusCode::UNAUTHORIZED, error_response.clone()))?;
+    let user = get_user_from_username(&state.db, &body.username)
+        .await
+        .map_err(|e| {eprintln!("db read failed: {e}"); (StatusCode::INTERNAL_SERVER_ERROR, error_fail)})?
+        .ok_or((StatusCode::UNAUTHORIZED, error_invalid.clone()))?;
 
     // Passes the submitted password and stored hash to handler for a validity check 
-    if !is_valid(&body.password, stored_hash) {
-        return Err((StatusCode::UNAUTHORIZED, error_response));
+    if !is_valid(&body.password, &user.password_hash) {
+        return Err((StatusCode::UNAUTHORIZED, error_invalid));
     }
 
     // Generate a random token
     let token: String = rand::rng().sample_iter(&Alphanumeric).take(50).map(char::from).collect();
     
     // Inserts token into AppState struct
-    state.tokens.lock().unwrap().insert(token.clone(), body.username.clone());
+    state.tokens.lock().unwrap().insert(token.clone(), user.username.clone());
 
     // Store token as cookie
     let mut cookie = Cookie::new("auth_token", token);

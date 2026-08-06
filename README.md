@@ -75,7 +75,15 @@ into the terminal and make sure the tests pass.
 ## Adding login authentication
 
 To secure the webpage we had added a login authentication method, where there can be multiple users. It should work like this:
-A user submits their username and password, which is sent to the backend through the api/login endpoint. The backend contains a list of users (username + hashed password) and checks the password against a stored hash. If it matches the program generates a random token and stores it in the hashmap and sends it to the frontend as a cookie. The middleware can then check the cookie-stored token against the backend hashmap stored token, and chose to proceed or reject user access.
+A user submits their username and password, which is sent to the backend through the api/login endpoint. The backend contains a database with a user credentials table, where passwords are stored as salted hashes, which the backend then checks the submitted password against the stored hash. If password matches the program generates a random token and stores it in a hashmap and sends it to the frontend as a cookie. The middleware can then check the cookie-stored token against the backend hashmap stored token, and chose to proceed or reject user access. In the way the program is build right now, the tokens are not stored in between sessions and all users will be logged out.
+
+## Adding user registration
+
+The example webpage now has user registration, where new users can be added and their credentials are saved in a table in the backend database! 
+
+## Splitting program into separate modules
+
+By now, the program has expanded quite a bit. To keep things tidy and readable we have split the program and put handlers into separate modules. For example, auth_handlers.rs contains all helper and handler functions used for user login authentication. To make sure that the main program can still access and use these handlers they have been made public by adding the pub keyword in front of all functions and structs.
 
 ## Splitting program into separate modules
 
