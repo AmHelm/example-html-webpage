@@ -12,17 +12,20 @@ Nodes have Foreign chain RPC configurations which are not visible in debug endpo
 
 ## Proposed solution
 
-Blaire will work as a standalone web application that serves Foreign chain RPC configuration debug information (e.g. foreign chain configuration, certain logs etc.) to authenticated users. Through Blaire, the MPC team members will save time and effort by simply requesting the webservice for information relevant to debugging.
+Blaire will work as a standalone web application that serves Foreign chain RPC configuration debug information (e.g. foreign chain configuration, certain logs etc.) to authenticated users. The current workflow is to ping each node operator manually and separately for the configurations. Through Blaire, the MPC team members will save time and effort by simply requesting the webservice for information relevant to debugging. 
 
 ## High level design
 
 The webservice will be accessible to authenticated MPC team members. 
 
 Work flow:
-1. User authenticate themselves to access the webpage.
-2. The user will be able to request the internal database for node configurations.
-3. The database provides the user with this information in an accessible way.
-4. (Potentially) The user will be able to save/copy/compare the information. 
+1. MPC nodes will publish their configurations to Blaire at startup and on reconfigurations.
+2. Blaire will authenticate, validate and then store the configuration information in a database.
+1. Users authenticate themselves to access the webpage.
+2. The user will be able to request Blaire for node configurations.
+3. Blaire reads its database to serve the information to users.
+4. The requests are recorded in an audit log.
+5. (Potentially) The user will be able to save/copy/compare the information. 
 
 ```mermaid
 ---
@@ -62,12 +65,15 @@ flowchart TD
     DB@{ shape: db}
 ```
 
-The MPC nodes will provide most configurations, but secrets will still be redacted for security reasons. The nodes will publish these configurations to Blaire at their startup.
+See [the Foreign chain configurations documentation](https://github.com/near/mpc/blob/0185bf46611aece50a9e876ed8ec0ef96133e421/docs/foreign-chain-transactions.md?plain=1#L631) for a configuration example snippet. 
+
+API keys for authentication will still need to be redacted for security reasons. The nodes will redact these secrets before they are published to Blaire, ensuring that no keys can be leaked in case of a breach.
 
 ### Requirements
 
 Required functions:
-- Authentication of users
+- Nodes publish redacted Foreign chain configurations   
+- Authentication of users (only a select group of team members) before site can be accessed
 - Store MPC nodes' Foreign chain configurations
 - Users able to request the database for configurations
 - Users can see their own request history 
@@ -77,51 +83,49 @@ Potential functionalities:
 - The ability to easily copy the information to clip board (button)
 - Hand-select several nodes of interest and get all of their configuration information at the same time
 - Compare different nodes' configurations
-- The MPC node operators having access to Blaire (means information will be more public)
+- The MPC node operators having access to Blaire 
 
 ## Wire formats/service API
-
-(What methods should be implemented, unsure of what to add here)
 
 Server endpoint/API root path: 
 https://URL (TBD)
 
-### MPC nodes <--> Blaire
+### MPC nodes --> Blaire
 
-POST /api/reports (adding a new config)
-or
-PUT /api/reports (modifying an already existing config)
-Where the MPC nodes will send their configurations information at their startup.
-(Unsure which of PUT/POST is the correct option here. Should there be a record of previous configs if a node operator is allowed to edit the config if PUT is allowed?)
+POST /api/v1/reports     publish config info     config:write   
+
+The reports will be posted through the Blaire API, where the configs are recorded at a node's startup or reconfiguration. The configurations will have a historic record, so that previous configurations could be compared to newer ones.
 
 ```rust
 async fn publish_node_config_report(
     State(state): State<AppState>,
-    report: ForeignChainConfig
+    node: AuthenticatedNode,
+    Json(report): ForeignChainConfig
 ) -> Result<StatusCode,ApiError> {}
 ```
 
 ### Blaire <--> Users
 
-PUT /api/login (log in authenticated users)
-PUT /api/logout (log out authenticated users)
-GET /api/nodes 
-GET /api/nodes/{node_id}/config (get a node's config information)
-GET /api/user/audit (access audit log for user)
-GET /api/node?id={node_id}&id={node_id} (compare different node configs/showing them in the same place)
+POST /api/login                             log in authenticated users
+POST /api/logout                            log out authenticated users
+GET /api/v1/nodes                           list currently participating nodes          nodes:read
+GET /api/v1/nodes/{node_id}/config          fetch latest reported config from a node    config:read
+GET /api/v1/nodes/{node_id}/history         fetch a node's config history               config:read
+GET /api/v1/node?id={node_id}&id={node_id}  compare different node configs              config:read
+GET /api/v1/user/audit                      list user actions/requests                  audit:read
 
 ```rust
-async fn get_node_configs(
+async fn get_node_config(
     State(state): State<AppState>,
-    node: Node,
-    user: User,
+    user: AuthenticatedUser,
+    Path(node_id): Path<NodeId>
 ) -> Result<Json<ForeignChainConfig>,ApiError> {}
 ```
 
 ```rust
 async fn list_user_audit_log(
     State(state): State<AppState>,
-    user: User,
+    user: AuthenticatedUser,
 ) -> Result<Json<AuditEvent>,ApiError> {}
 ```
 
@@ -131,22 +135,27 @@ async fn list_user_audit_log(
 
 ### Structs
 
-(Very much a work in progress...)
 ```rust
-pub struct User {
-    pub id: i64,
-    pub username: String,
-    pub password_hash: String,
+pub struct AuthenticatedUser {
+    pub username: String,       //username or email, depending on future authentication
 }
 ```
 
+[The NodeId struct will be based on the existing type of the same name in the MPC repository](https://github.com/near/mpc/blob/fb32ae3787e0e445168260591e3e00213b786adc/crates/near-mpc-contract-interface/src/types/tee.rs#L24)
+(fix so that other parts in the document use the same names, ie node_id/account_id)
 ```rust
-pub struct Node {
-    pub node_id: String,
-    pub key_hash: String,
+pub struct NodeId {
+    /// Operator account.
+    pub account_id: AccountId,
+    /// TLS public key used by the node for peer-to-peer communication.
+    pub tls_public_key: Ed25519PublicKey,
+    /// Full-access Ed25519 public key of the operator account.
+    pub account_public_key: Ed25519PublicKey,
 }
 ```
 
+TODO: Link to existing Foreign chain configin the MPC repository
+[Foreign chain config struct](https://github.com/near/mpc/blob/b647bcd117ee8fcd09e17ad3a963dbf6078403fa/crates/node-config/src/foreign_chains.rs#L46)
 ```rust
 pub struct ForeignChainConfig {
     pub id: i64,
@@ -154,7 +163,6 @@ pub struct ForeignChainConfig {
     pub config: String, //JSON?
 }
 ```
-
 
 ### Database
 
@@ -172,7 +180,7 @@ The back-end will connect to a database containing some of the following tables.
 ```sql
 CREATE TABLE node_config_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    node_id TEXT NOT NULL UNIQUE,
+    node_id TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     fc_config TEXT NOT NULL
 );
@@ -211,20 +219,20 @@ CREATE TABLE audit_log (
 );
 ```
 
-#### Node access key
+#### Node credentials
 
-| Node ID       | Access key (hashed)   |
-| ------------- | -------------         |
-| Near #1       | .......               |
-| Everstake     | .......               |
-| ....          | .......               |
+| Node ID       | Token hash     |
+| ------------- | -------------  |
+| Near #1       | .......        |
+| Everstake     | .......        |
+| ....          | .......        |
 
 
 ```sql
-CREATE TABLE node_access_keys (
+CREATE TABLE node_credentials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     node_id TEXT NOT NULL UNIQUE,
-    access_key TEXT NOT NULL
+    token_hash TEXT NOT NULL    -- for authentication/access
 );
 ```
 
@@ -232,6 +240,10 @@ CREATE TABLE node_access_keys (
 
 Initially, while in development, the webpage will have an authentications system where there will only be one single user, with a username and password configured in environment variables. Once the webpage is ready for deployment, there should be a stronger authentication system in place (details TBD).
 
+Possible authentication methods:
+- Some sort of SSO service, using NEAR One org emails, with the ability to revoke access
+- GitHub OAth/integration, where access could build on group permissions 
+
 ### Risks
 
-The configuration information used to be public but was withdrawn as an extra precaution. If the debug service were to be hacked and this information is leaked, we highten the risk to our node system. Therefore, security should still be strong and accessibility limited to only MPC team members. 
+The configuration information used to be public but was withdrawn as an extra precaution. If the debug service were to be hacked and this information is leaked, we heighten the risk to our node system. Therefore, security should still be strong and accessibility limited to only MPC team members. 
